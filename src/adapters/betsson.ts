@@ -282,6 +282,10 @@ export async function scrapeBetssonFootballPrematch(
     return node.innerText || node.textContent || "";
   });
 
+  const countryMatch = bodyText.match(/"countryCode":"([A-Z]{2})"/);
+const detectedCountry = countryMatch?.[1] ?? "UNKNOWN";
+console.log("BETSSON detected country:", detectedCountry);
+
   console.log("BETSSON bodyText preview start");
   console.log(bodyText.slice(0, 3000));
   console.log("BETSSON bodyText preview end");
