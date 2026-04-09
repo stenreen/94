@@ -1,0 +1,13 @@
+```text
+betting-odds-collector/
+  src/
+  sql/
+  .github/
+  package.json
+  tsconfig.json
+  playwright.config.ts
+  .env.example
+  README.md
+  STEP_BY_STEP_SV.md/
+  
+```
