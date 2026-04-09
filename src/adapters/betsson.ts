@@ -1,5 +1,5 @@
 import { Page } from "playwright";
-import { RawMatchOdds } from "../types/odds.js";
+import { RawMatchOdds } from "../types/odds";
 
 const BETSSON_LEAGUE_URL =
   process.env.BETSSON_LEAGUE_URL ??
@@ -39,7 +39,7 @@ function cleanLine(line: string): string {
 }
 
 function isDecimalOdds(value: string): boolean {
-  return /^\d+(\.\d+)?$/.test(value.trim());
+  return /^\d+([.,]\d+)?$/.test(value.trim());
 }
 
 function parseOdds(value: string): number {
@@ -101,6 +101,14 @@ function parseBetssonLeagueText(
       continue;
     }
 
+    // Variant 1:
+    // Matchresultat
+    // Hemmalag
+    // 2.10
+    // Oavgjort
+    // 3.40
+    // Bortalag
+    // 3.20
     if (
       line === "Matchresultat" &&
       currentDateIso &&
@@ -116,27 +124,64 @@ function parseBetssonLeagueText(
       const oddsX = parseOdds(lines[i + 4]);
       const odds2 = parseOdds(lines[i + 6]);
 
-      if (!homeTeam || !awayTeam) continue;
-      if (homeTeam === "Totalt antal mål" || awayTeam === "Totalt antal mål") {
-        continue;
+      if (homeTeam && awayTeam) {
+        results.push({
+          bookmaker: "betsson",
+          league,
+          home_team: homeTeam,
+          away_team: awayTeam,
+          commence_time: currentDateIso,
+          source_url: sourceUrl,
+          odds_1: odds1,
+          odds_x: oddsX,
+          odds_2: odds2,
+          raw: {
+            parser: "betsson-league-text-v2-variant1",
+            date_heading_iso: currentDateIso,
+            extracted_from_lines: lines.slice(Math.max(0, i - 2), i + 10)
+          }
+        });
       }
+    }
 
-      results.push({
-        bookmaker: "betsson",
-        league,
-        home_team: homeTeam,
-        away_team: awayTeam,
-        commence_time: currentDateIso,
-        source_url: sourceUrl,
-        odds_1: odds1,
-        odds_x: oddsX,
-        odds_2: odds2,
-        raw: {
-          parser: "betsson-league-text-v1",
-          date_heading_iso: currentDateIso,
-          extracted_from_lines: lines.slice(Math.max(0, i - 2), i + 10)
+    // Variant 2, lite lösare:
+    // Matchresultat ... Oavgjort ...
+    if (line === "Matchresultat" && currentDateIso) {
+      const windowLines = lines.slice(i, i + 12);
+
+      const drawIndex = windowLines.findIndex((x) => x === "Oavgjort");
+      if (drawIndex > 1 && drawIndex + 2 < windowLines.length) {
+        const maybeHome = windowLines[1];
+        const maybeOdds1 = windowLines[2];
+        const maybeOddsX = windowLines[drawIndex + 1];
+        const maybeAway = windowLines[drawIndex + 2];
+        const maybeOdds2 = windowLines[drawIndex + 3];
+
+        if (
+          maybeHome &&
+          maybeAway &&
+          isDecimalOdds(maybeOdds1) &&
+          isDecimalOdds(maybeOddsX) &&
+          isDecimalOdds(maybeOdds2)
+        ) {
+          results.push({
+            bookmaker: "betsson",
+            league,
+            home_team: maybeHome,
+            away_team: maybeAway,
+            commence_time: currentDateIso,
+            source_url: sourceUrl,
+            odds_1: parseOdds(maybeOdds1),
+            odds_x: parseOdds(maybeOddsX),
+            odds_2: parseOdds(maybeOdds2),
+            raw: {
+              parser: "betsson-league-text-v2-variant2",
+              date_heading_iso: currentDateIso,
+              extracted_from_lines: windowLines
+            }
+          });
         }
-      });
+      }
     }
   }
 
@@ -157,47 +202,120 @@ async function acceptCookiesIfPresent(page: Page): Promise<void> {
   const candidates = [
     page.getByRole("button", { name: /acceptera/i }),
     page.getByRole("button", { name: /accept/i }),
-    page.getByRole("button", { name: /godkänn/i })
+    page.getByRole("button", { name: /godkänn/i }),
+    page.getByRole("button", { name: /jag accepterar/i }),
+    page.getByRole("button", { name: /allow all/i })
   ];
 
   for (const locator of candidates) {
     try {
       if (await locator.isVisible({ timeout: 1500 })) {
         await locator.click({ timeout: 1500 });
+        console.log("BETSSON cookie button clicked");
         return;
       }
     } catch {
       // ignorera
     }
   }
+
+  console.log("BETSSON no cookie button clicked");
 }
 
 export async function scrapeBetssonFootballPrematch(
   page: Page
 ): Promise<RawMatchOdds[]> {
+  const networkHits: Array<{
+    url: string;
+    status: number;
+    type: string;
+    contentType: string;
+  }> = [];
+
+  page.on("response", async (response) => {
+    try {
+      const url = response.url();
+      const contentType = response.headers()["content-type"] || "";
+      const resourceType = response.request().resourceType();
+
+      const looksInteresting =
+        resourceType === "xhr" ||
+        resourceType === "fetch" ||
+        contentType.includes("json") ||
+        /odds|event|fixture|market|sport|match/i.test(url);
+
+      if (looksInteresting) {
+        networkHits.push({
+          url,
+          status: response.status(),
+          type: resourceType,
+          contentType
+        });
+      }
+    } catch {
+      // ignorera
+    }
+  });
+
   await page.goto(BETSSON_LEAGUE_URL, {
     waitUntil: "domcontentloaded",
     timeout: 60000
   });
+
+  console.log("BETSSON current url:", page.url());
+
+  try {
+    console.log("BETSSON title:", await page.title());
+  } catch {
+    console.log("BETSSON title: <unavailable>");
+  }
 
   await acceptCookiesIfPresent(page);
 
   const body = page.locator("body");
   await body.waitFor({ state: "visible", timeout: 15000 });
 
-  await page.waitForTimeout(2500);
+  await page.waitForTimeout(5000);
 
   const bodyText = await body.evaluate((el) => {
     const node = el as HTMLElement;
     return node.innerText || node.textContent || "";
   });
 
+  console.log("BETSSON bodyText preview start");
+  console.log(bodyText.slice(0, 3000));
+  console.log("BETSSON bodyText preview end");
+
   const lines = extractVisibleLines(bodyText);
+
+  console.log("BETSSON lines count:", lines.length);
+  console.log("BETSSON first 80 lines:");
+  console.log(JSON.stringify(lines.slice(0, 80), null, 2));
+
   const matches = parseBetssonLeagueText(
     lines,
     BETSSON_LEAGUE_URL,
     BETSSON_LEAGUE_NAME,
     BETSSON_DEFAULT_YEAR
+  );
+
+  console.log("BETSSON parsed matches count:", matches.length);
+  console.log(JSON.stringify(matches.slice(0, 3), null, 2));
+
+  console.log("BETSSON network hits count:", networkHits.length);
+  console.log(
+    JSON.stringify(
+      networkHits
+        .slice(0, 20)
+        .map((x) => ({
+          url: x.url,
+          status: x.status,
+          type: x.type,
+          contentType: x.contentType
+        })),
+      null,
+      2
+    )
   );
 
   return matches;
