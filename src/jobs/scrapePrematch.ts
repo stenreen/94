@@ -33,6 +33,8 @@ async function main() {
       }
       throw new Error(`Unsupported bookmaker: ${bookmaker}`);
     });
+    logInfo("Matches extracted", { bookmaker, count: matches.length });
+console.log(JSON.stringify(matches.slice(0, 3), null, 2));
 
     let rowsWritten = 0;
 
