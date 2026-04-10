@@ -3,7 +3,6 @@ name: Daily API-Football odds scrape
 on:
   workflow_dispatch:
   schedule:
-    # GitHub cron = UTC. 08:15 UTC = 09:15 CET / 10:15 CEST.
     - cron: "15 8 * * *"
 
 jobs:
@@ -49,5 +48,5 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           APIFOOTBALL_API_KEY: ${{ secrets.APIFOOTBALL_API_KEY }}
           LEAGUE_IDS: "39,140,135,113,78,61,94,88"
-LOOKAHEAD_DAYS: "4"
+          LOOKAHEAD_DAYS: "4"
         run: npm run scrape
