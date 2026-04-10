@@ -75,7 +75,19 @@ function numberFromOdd(value: string | number | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function pickH2HValues(values: Array<{ value: string; odd: string | number }>): {
+function normalizeLabel(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\./g, "")
+    .replace(/\s+/g, " ");
+}
+
+function pickH2HValues(
+  values: Array<{ value: string; odd: string | number }>,
+  homeTeamName: string,
+  awayTeamName: string
+): {
   one: number;
   draw: number;
   two: number;
@@ -84,14 +96,34 @@ function pickH2HValues(values: Array<{ value: string; odd: string | number }>): 
   let draw: number | null = null;
   let two: number | null = null;
 
+  const homeNorm = normalizeLabel(homeTeamName);
+  const awayNorm = normalizeLabel(awayTeamName);
+
   for (const item of values) {
-    const label = item.value.trim().toLowerCase();
+    const label = normalizeLabel(item.value);
     const odd = numberFromOdd(item.odd);
     if (odd === null) continue;
 
-    if (["home", "1"].includes(label)) one = odd;
-    if (["draw", "x"].includes(label)) draw = odd;
-    if (["away", "2"].includes(label)) two = odd;
+    if (
+      label === homeNorm ||
+      ["home", "1", "1 (home)", "home team"].includes(label)
+    ) {
+      one = odd;
+      continue;
+    }
+
+    if (label === "draw" || label === "x") {
+      draw = odd;
+      continue;
+    }
+
+    if (
+      label === awayNorm ||
+      ["away", "2", "2 (away)", "away team"].includes(label)
+    ) {
+      two = odd;
+      continue;
+    }
   }
 
   if (one !== null && draw !== null && two !== null) {
@@ -101,7 +133,11 @@ function pickH2HValues(values: Array<{ value: string; odd: string | number }>): 
   return null;
 }
 
-function extractH2HMarket(bookmakers: z.infer<typeof BookmakerSchema>[]): {
+function extractH2HMarket(
+  bookmakers: z.infer<typeof BookmakerSchema>[],
+  homeTeamName: string,
+  awayTeamName: string
+): {
   bookmakerName: string;
   odds1: number;
   oddsX: number;
@@ -114,10 +150,18 @@ function extractH2HMarket(bookmakers: z.infer<typeof BookmakerSchema>[]): {
         betName.includes("match winner") ||
         betName.includes("winner") ||
         betName.includes("result") ||
-        betName.includes("1x2");
+        betName.includes("1x2") ||
+        betName.includes("fulltime result") ||
+        betName.includes("full time result");
 
       if (!looksLikeMatchWinner) continue;
-      const parsed = pickH2HValues(bet.values ?? []);
+
+      const parsed = pickH2HValues(
+        bet.values ?? [],
+        homeTeamName,
+        awayTeamName
+      );
+
       if (!parsed) continue;
 
       return {
@@ -190,7 +234,7 @@ export async function scrapeApiFootballDailyOdds(): Promise<RawMatchOdds[]> {
         const leagueName = item.league?.name;
         const home = item.teams?.home?.name;
         const away = item.teams?.away?.name;
-        const market = extractH2HMarket(item.bookmakers ?? []);
+        const market = extractH2HMarket(item.bookmakers ?? [], home, away);
 
         if (!fixtureId || !commenceTime || !leagueName || !home || !away || !market) {
           continue;
