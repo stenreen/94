@@ -1,9 +1,10 @@
-name: Scrape prematch odds
+name: Daily API-Football odds scrape
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "7,22,37,52 * * * *"
+    # GitHub cron = UTC. 08:15 UTC = 09:15 CET / 10:15 CEST.
+    - cron: "15 8 * * *"
 
 jobs:
   scrape:
@@ -17,18 +18,36 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 24
-         
 
       - name: Install dependencies
         run: npm install
 
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+      - name: Check required secrets
+        shell: bash
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          APIFOOTBALL_API_KEY: ${{ secrets.APIFOOTBALL_API_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ]; then
+            echo "SUPABASE_URL saknas"
+            exit 1
+          fi
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "SUPABASE_SERVICE_ROLE_KEY saknas"
+            exit 1
+          fi
+          if [ -z "$APIFOOTBALL_API_KEY" ]; then
+            echo "APIFOOTBALL_API_KEY saknas"
+            exit 1
+          fi
+          echo "Secrets ser OK ut"
 
       - name: Run scraper
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SCRAPE_TARGET: betsson
-          HEADLESS: true
+          APIFOOTBALL_API_KEY: ${{ secrets.APIFOOTBALL_API_KEY }}
+          LEAGUE_IDS: "113,39,140,135,78,61,94,88,203,144"
+          SEASON: "2026"
         run: npm run scrape
