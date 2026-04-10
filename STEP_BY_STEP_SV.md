@@ -1,351 +1,116 @@
-# Steg för steg – exakt vad du ska göra
+# API-Football gratisversion – steg för steg
 
-Här är den praktiska ordningen. Följ den uppifrån och ner.
+Det här är den gratis ombyggda versionen.
 
----
+## Vad som är ändrat
+- Betsson/Playwright är borttaget.
+- Projektet använder nu API-Football i stället.
+- Tanken är **1 körning per dag** för att hålla sig inom gratisnivån.
 
-## 1. Packa upp ZIP-filen
+## Gratisbudget – enkel regel
+API-Footballs gratisplan ger **100 requests per dag**. Odds finns även i gratisplanen. Deras guide säger också att `/odds` kan filtreras med `league + season + date`, vilket gör det naturligt att köra ungefär **1 odds-request per liga och dag**.
 
-När du laddat ner ZIP-filen:
+Praktiskt betyder det:
+- teoretiskt kan du ligga nära 100 ligor om allt är extremt snålt
+- praktiskt rekommenderar jag **10–30 ligor**
+- vill du ha marginal för felsökning, retries och testkörningar: håll dig kring **10–20 ligor**
 
-1. Packa upp den på datorn.
-2. Du får en mapp som heter `betting-odds-collector`.
-3. Det är **hela projektet**.
+## Filstruktur
+- `src/adapters/apiFootball.ts` = hämtar odds från API-Football
+- `src/jobs/scrapeDailyOdds.ts` = kör jobbet och sparar till Supabase
+- `sql/init.sql` = tabellerna i Supabase
+- `.github/workflows/scrape.yml` = dagligt schema i GitHub Actions
 
----
+## 1. Skapa API-Football-konto
+1. Gå till API-Football.
+2. Registrera gratis konto.
+3. Hämta din API-nyckel.
 
-## 2. Skapa Supabase-projekt
-
+## 2. Skapa/öppna Supabase-projekt
 1. Gå till Supabase.
-2. Skapa ett nytt projekt.
-3. När projektet är klart går du till **SQL Editor**.
-4. Öppna filen:
+2. Skapa nytt projekt eller använd ditt befintliga.
+3. Öppna **SQL Editor**.
+4. Kör innehållet i `sql/init.sql`.
 
-```text
-sql/init.sql
+## 3. Hämta dina Supabase-värden
+Du behöver:
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+## 4. Lägg upp koden i GitHub
+Lägg upp hela projektmappen i ett repo.
+
+## 5. Lägg in GitHub Secrets
+I GitHub:
+**Settings → Secrets and variables → Actions**
+
+Skapa dessa tre secrets:
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `APIFOOTBALL_API_KEY`
+
+## 6. Välj ligor
+I workflow-filen finns denna rad:
+
+```yaml
+LEAGUE_IDS: "113,39,140,135,78,61,94,88,203,144"
 ```
 
-5. Kopiera allt i den filen.
-6. Klistra in i Supabase SQL Editor.
-7. Kör SQL-scriptet.
+Det är bara exempel. Du kan ändra till vilka ligor du vill.
 
-Detta skapar tabellerna:
+### Tumregel
+- 1 liga = ungefär 1 odds-request per dag
+- 10 ligor = ungefär 10 requests per dag
+- 20 ligor = ungefär 20 requests per dag
 
-- `events`
-- `odds_snapshots`
-- `scrape_runs`
+## 7. Säsong
+I workflow-filen finns:
 
----
-
-## 3. Hämta dina Supabase-nycklar
-
-I Supabase-projektet:
-
-1. Gå till **Project Settings**.
-2. Gå till **API**.
-3. Kopiera:
-   - `Project URL`
-   - `service_role key`
-
-Du ska använda dem senare i GitHub Secrets.
-
----
-
-## 4. Skapa GitHub-repo
-
-1. Gå till GitHub.
-2. Skapa ett nytt repo, till exempel:
-
-```text
-betting-odds-collector
+```yaml
+SEASON: "2026"
 ```
 
-3. Ladda upp **alla filer** från den uppackade mappen till repot.
+Ändra om du vill hämta en annan säsong.
 
-Det viktiga är att strukturen ser ut så här i GitHub:
+## 8. Kör manuellt första gången
+I GitHub:
+1. gå till **Actions**
+2. välj workflowet
+3. klicka **Run workflow**
 
-```text
-betting-odds-collector/
-  src/
-  sql/
-  .github/
-  package.json
-  tsconfig.json
-  playwright.config.ts
-  .env.example
-  README.md
-  STEP_BY_STEP_SV.md
+## 9. Kontrollera i Supabase
+Kör dessa frågor i SQL Editor:
+
+```sql
+select * from scrape_runs order by started_at desc limit 5;
 ```
 
----
-
-## 5. Var varje fil ska ligga
-
-Här är exakt var filerna ska ligga.
-
-### I projektets rotmapp
-
-Lägg dessa direkt i huvudmappen:
-
-- `package.json`
-- `tsconfig.json`
-- `playwright.config.ts`
-- `.env.example`
-- `README.md`
-- `STEP_BY_STEP_SV.md`
-
-### I `sql/`
-
-Lägg denna fil här:
-
-- `sql/init.sql`
-
-### I `src/adapters/`
-
-Lägg denna fil här:
-
-- `src/adapters/betsson.ts`
-
-### I `src/core/`
-
-Lägg dessa filer här:
-
-- `src/core/browser.ts`
-- `src/core/logger.ts`
-- `src/core/matcher.ts`
-- `src/core/normalize.ts`
-
-### I `src/db/`
-
-Lägg denna fil här:
-
-- `src/db/supabase.ts`
-
-### I `src/jobs/`
-
-Lägg denna fil här:
-
-- `src/jobs/scrapePrematch.ts`
-
-### I `src/types/`
-
-Lägg denna fil här:
-
-- `src/types/odds.ts`
-
-### I `src/`
-
-Lägg denna fil direkt här:
-
-- `src/index.ts`
-
-### I `.github/workflows/`
-
-Lägg denna fil här:
-
-- `.github/workflows/scrape.yml`
-
----
-
-## 6. Lägg in GitHub Secrets
-
-I GitHub-repot:
-
-1. Gå till **Settings**
-2. Gå till **Secrets and variables**
-3. Gå till **Actions**
-4. Klicka på **New repository secret**
-
-Skapa två secrets:
-
-### Secret 1
-
-**Name**
-```text
-SUPABASE_URL
+```sql
+select * from events order by created_at desc limit 20;
 ```
 
-**Value**
-```text
-Din Project URL från Supabase
+```sql
+select * from odds_snapshots order by scraped_at desc limit 50;
 ```
 
-### Secret 2
+## 10. Om du vill öka antalet ligor
+Ja, det går mycket bättre nu när du bara kör **1 gång per dag**.
 
-**Name**
-```text
-SUPABASE_SERVICE_ROLE_KEY
-```
+Min rekommendation:
+- börja med 5–10 ligor
+- om loggarna ser bra ut, höj till 15–20
+- håll lite marginal under 100 requests/dag
 
-**Value**
-```text
-Din service_role key från Supabase
-```
+## 11. Om du vill fokusera på en bookmaker
+Du kan använda miljövariabeln `BOOKMAKER_ID` i `.env` eller lägga till den i workflowet senare.
+Det är valfritt.
 
----
+## 12. Viktigt om GitHub-repot
+GitHub-hosted runners är gratis i **public repos**. Om du kör private repo på gratisplan har du en begränsad mängd GitHub Actions-minuter.
 
-## 7. Vad `.env.example` är till för
-
-Den filen används mest som mall om du kör lokalt.
-
-Om du vill köra lokalt:
-
-1. Kopiera `.env.example`
-2. Döp kopian till `.env`
-3. Fyll i riktiga värden
-
-Exempel:
-
-```env
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=din_riktiga_key
-SCRAPE_TARGET=betsson
-HEADLESS=true
-BETSSON_LEAGUE_URL=https://www.betsson.com/sv/odds/fotboll/sverige/superettan
-BETSSON_LEAGUE_NAME=Superettan
-BETSSON_DEFAULT_YEAR=2026
-```
-
----
-
-## 8. Kör första testet lokalt
-
-Om du vill testa på datorn först:
-
-1. Installera Node.js 20+
-2. Öppna terminal i projektmappen
-3. Kör:
-
-```bash
-npm install
-npx playwright install --with-deps chromium
-npm run scrape
-```
-
-Om allt går bra ska scriptet:
-
-- öppna Betsson-sidan
-- läsa odds
-- spara data i Supabase
-- logga körningen i `scrape_runs`
-
----
-
-## 9. Kör första testet i GitHub
-
-När repot och secrets är på plats:
-
-1. Gå till **Actions** i GitHub
-2. Öppna workflow:
-
-```text
-Scrape prematch odds
-```
-
-3. Klicka **Run workflow**
-4. Vänta tills jobbet är klart
-
-Om det fungerar ska du få nya rader i:
-
-- `scrape_runs`
-- `events`
-- `odds_snapshots`
-
----
-
-## 10. Hur du kollar att det fungerade i Supabase
-
-Gå till **Table Editor** i Supabase och kontrollera:
-
-### `scrape_runs`
-Här ser du om jobbet gick bra eller inte.
-
-Kolla särskilt kolumnerna:
-
-- `ok`
-- `matches_seen`
-- `rows_written`
-- `error_text`
-
-### `events`
-Här ser du matcher som skapats.
-
-### `odds_snapshots`
-Här ser du själva oddsen.
-
-Varje match ska ge tre rader:
-
-- `1`
-- `X`
-- `2`
-
----
-
-## 11. Viktigt att känna till
-
-Den första adaptern använder ligasidans renderade text.
-Det betyder:
-
-- bra för första version
-- enkel att komma igång med
-- men starttiden är uppskattad mitt på dagen i UTC
-
-Så detta är ett bra första datalager, men inte slutversionen.
-
----
-
-## 12. Nästa steg efter första lyckade körningen
-
-När första körningen fungerar ska du göra detta i ordning:
-
-1. lägg till bättre exakt matchtid
-2. lägg till bookmaker nummer 2
-3. lägg till bookmaker nummer 3
-4. bygg jämförelse mellan odds
-5. bygg value/edge-logik
-6. bygg UI eller dashboard
-
----
-
-## 13. Om något går fel
-
-Titta i denna ordning:
-
-1. GitHub Actions-loggen
-2. tabellen `scrape_runs`
-3. att secrets är rätt
-4. att SQL-scriptet verkligen körts
-5. att Betsson-sidan fortfarande visar rätt textmönster
-
----
-
-## 14. Kort förklaring av filerna
-
-### `src/adapters/betsson.ts`
-Här hämtas odds från Betsson.
-
-### `src/jobs/scrapePrematch.ts`
-Detta är jobbet som kör hela flödet.
-
-### `src/core/normalize.ts`
-Här delas varje match upp i tre oddsrader: 1, X, 2.
-
-### `src/db/supabase.ts`
-Här kopplar projektet upp sig mot Supabase.
-
-### `.github/workflows/scrape.yml`
-Här styrs den automatiska körningen i GitHub Actions.
-
----
-
-## 15. Enklaste vägen om du vill komma igång snabbt
-
-Om du vill göra det absolut enklast:
-
-1. kör SQL i Supabase
-2. ladda upp hela projektet till GitHub
-3. lägg in två GitHub Secrets
-4. kör workflow manuellt
-5. kontrollera tabellerna i Supabase
-
-Det är snabbaste vägen till första fungerande version.
+## 13. Nästa steg efter att detta fungerar
+När du har data i tabellerna är nästa naturliga steg:
+- SQL-fråga för **bästa odds per match**
+- enkel dashboard
+- value/edge-logik
+- topplista per liga
