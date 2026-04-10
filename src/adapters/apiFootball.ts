@@ -27,28 +27,59 @@ const BookmakerSchema = z.object({
 });
 
 const ResponseItemSchema = z.object({
-  fixture: z.object({
-    id: z.number(),
-    date: z.string()
-  }).optional(),
-  league: z.object({
-    id: z.number().optional(),
-    name: z.string().optional()
-  }).optional(),
-  teams: z.object({
-    home: z.object({ name: z.string().optional() }).optional(),
-    away: z.object({ name: z.string().optional() }).optional()
-  }).optional(),
+  fixture: z
+    .object({
+      id: z.number(),
+      date: z.string()
+    })
+    .optional(),
+  league: z
+    .object({
+      id: z.number().optional(),
+      name: z.string().optional()
+    })
+    .optional(),
+  teams: z
+    .object({
+      home: z.object({ name: z.string().optional() }).optional(),
+      away: z.object({ name: z.string().optional() }).optional()
+    })
+    .optional(),
   bookmakers: z.array(BookmakerSchema).optional()
 });
 
-const ApiResponseSchema = z.object({
+const OddsApiResponseSchema = z.object({
   results: z.number().optional(),
-  paging: z.object({ current: z.number().optional(), total: z.number().optional() }).optional(),
+  paging: z
+    .object({
+      current: z.number().optional(),
+      total: z.number().optional()
+    })
+    .optional(),
   response: z.array(ResponseItemSchema)
 });
 
-type FetchParams = {
+const LeagueSeasonSchema = z.object({
+  year: z.number(),
+  current: z.boolean().optional()
+});
+
+const LeagueInfoSchema = z.object({
+  league: z
+    .object({
+      id: z.number().optional(),
+      name: z.string().optional()
+    })
+    .optional(),
+  seasons: z.array(LeagueSeasonSchema).optional()
+});
+
+const LeagueApiResponseSchema = z.object({
+  results: z.number().optional(),
+  response: z.array(LeagueInfoSchema)
+});
+
+type FetchOddsParams = {
   leagueId: number;
   season: number;
   date: string;
@@ -64,9 +95,38 @@ function parseLeagueIds(raw: string | undefined): number[] {
     .filter((x) => Number.isFinite(x));
 }
 
-function detectTargetDate(): string {
-  if (process.env.TARGET_DATE) return process.env.TARGET_DATE;
-  return new Date().toISOString().slice(0, 10);
+function getLookaheadDays(): number {
+  const n = Number(process.env.LOOKAHEAD_DAYS ?? "4");
+  if (!Number.isFinite(n) || n < 0) return 4;
+  return Math.floor(n);
+}
+
+function getStartDate(): Date {
+  if (process.env.TARGET_DATE) {
+    const d = new Date(`${process.env.TARGET_DATE}T00:00:00Z`);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
+
+function formatDateUTC(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function buildDateRange(): string[] {
+  const start = getStartDate();
+  const lookaheadDays = getLookaheadDays();
+  const dates: string[] = [];
+
+  for (let i = 0; i <= lookaheadDays; i++) {
+    const d = new Date(start);
+    d.setUTCDate(start.getUTCDate() + i);
+    dates.push(formatDateUTC(d));
+  }
+
+  return dates;
 }
 
 function numberFromOdd(value: string | number | undefined): number | null {
@@ -112,7 +172,7 @@ function pickH2HValues(
       continue;
     }
 
-    if (label === "draw" || label === "x") {
+    if (["draw", "x", "tie"].includes(label)) {
       draw = odd;
       continue;
     }
@@ -146,6 +206,7 @@ function extractH2HMarket(
   for (const bookmaker of bookmakers) {
     for (const bet of bookmaker.bets ?? []) {
       const betName = (bet.name ?? "").toLowerCase();
+
       const looksLikeMatchWinner =
         betName.includes("match winner") ||
         betName.includes("winner") ||
@@ -176,7 +237,45 @@ function extractH2HMarket(
   return null;
 }
 
-async function fetchOddsPage(params: FetchParams, page = 1) {
+async function fetchJson(url: URL) {
+  const res = await fetch(url, {
+    headers: {
+      "x-apisports-key": API_KEY as string
+    }
+  });
+
+  if (!res.ok) {
+    throw new Error(`API-Football request failed ${res.status} for ${url.toString()}`);
+  }
+
+  return res.json();
+}
+
+async function fetchCurrentSeasonForLeague(leagueId: number): Promise<number> {
+  if (process.env.SEASON) {
+    const forced = Number(process.env.SEASON);
+    if (Number.isFinite(forced)) return forced;
+  }
+
+  const url = new URL(`${API_BASE}/leagues`);
+  url.searchParams.set("id", String(leagueId));
+  url.searchParams.set("current", "true");
+
+  const json = await fetchJson(url);
+  const payload = LeagueApiResponseSchema.parse(json);
+
+  const first = payload.response[0];
+  const currentSeason = first?.seasons?.find((s) => s.current)?.year;
+
+  if (currentSeason && Number.isFinite(currentSeason)) {
+    return currentSeason;
+  }
+
+  const currentYear = new Date().getUTCFullYear();
+  return currentYear;
+}
+
+async function fetchOddsPage(params: FetchOddsParams, page = 1) {
   const url = new URL(`${API_BASE}/odds`);
   url.searchParams.set("league", String(params.leagueId));
   url.searchParams.set("season", String(params.season));
@@ -187,79 +286,117 @@ async function fetchOddsPage(params: FetchParams, page = 1) {
     url.searchParams.set("bookmaker", params.bookmakerId);
   }
 
-  const res = await fetch(url, {
-    headers: {
-      "x-apisports-key": API_KEY
-    }
-  });
-
-  if (!res.ok) {
-    throw new Error(`API-Football request failed ${res.status} for ${url.toString()}`);
-  }
-
-  const json = await res.json();
-  return ApiResponseSchema.parse(json);
+  const json = await fetchJson(url);
+  return OddsApiResponseSchema.parse(json);
 }
 
 export async function scrapeApiFootballDailyOdds(): Promise<RawMatchOdds[]> {
   const leagueIds = parseLeagueIds(process.env.LEAGUE_IDS);
-  const season = Number(process.env.SEASON ?? new Date().getUTCFullYear());
-  const date = detectTargetDate();
   const bookmakerId = process.env.BOOKMAKER_ID?.trim() || undefined;
+  const dates = buildDateRange();
 
   if (leagueIds.length === 0) {
     throw new Error("No LEAGUE_IDS configured");
   }
 
   const output: RawMatchOdds[] = [];
+  const seenKeys = new Set<string>();
+  const seasonCache = new Map<number, number>();
+  let noMarketDebugCount = 0;
 
   for (const leagueId of leagueIds) {
-    let page = 1;
-    let totalPages = 1;
+    let season = seasonCache.get(leagueId);
 
-    do {
-      const payload = await fetchOddsPage({ leagueId, season, date, bookmakerId }, page);
-      totalPages = payload.paging?.total ?? 1;
+    if (!season) {
+      season = await fetchCurrentSeasonForLeague(leagueId);
+      seasonCache.set(leagueId, season);
 
-      logInfo("API-Football page fetched", {
+      logInfo("API-Football season resolved", {
         leagueId,
-        page,
-        totalPages,
-        results: payload.results ?? payload.response.length
+        season
       });
+    }
 
-      for (const item of payload.response) {
-        const fixtureId = item.fixture?.id;
-        const commenceTime = item.fixture?.date;
-        const leagueName = item.league?.name;
-        const home = item.teams?.home?.name;
-        const away = item.teams?.away?.name;
-        const market = extractH2HMarket(item.bookmakers ?? [], home, away);
+    for (const date of dates) {
+      let page = 1;
+      let totalPages = 1;
 
-        if (!fixtureId || !commenceTime || !leagueName || !home || !away || !market) {
-          continue;
+      do {
+        const payload = await fetchOddsPage(
+          { leagueId, season, date, bookmakerId },
+          page
+        );
+
+        totalPages = payload.paging?.total ?? 1;
+
+        logInfo("API-Football page fetched", {
+          leagueId,
+          season,
+          date,
+          page,
+          totalPages,
+          results: payload.results ?? payload.response.length
+        });
+
+        for (const item of payload.response) {
+          const fixtureId = item.fixture?.id;
+          const commenceTime = item.fixture?.date;
+          const leagueName = item.league?.name;
+          const home = item.teams?.home?.name;
+          const away = item.teams?.away?.name;
+
+          if (!fixtureId || !commenceTime || !leagueName || !home || !away) {
+            continue;
+          }
+
+          const market = extractH2HMarket(item.bookmakers ?? [], home, away);
+
+          if (!market) {
+            if (item.bookmakers?.length && noMarketDebugCount < 15) {
+              noMarketDebugCount += 1;
+              console.log("NO_H2H_MARKET_FOR_FIXTURE", {
+                fixtureId,
+                home,
+                away,
+                leagueName,
+                bookmakerNames: item.bookmakers.map((b) => b.name),
+                firstBetNames: item.bookmakers
+                  .flatMap((b) => (b.bets ?? []).map((x) => x.name))
+                  .slice(0, 12)
+              });
+            }
+            continue;
+          }
+
+          const dedupeKey = `${fixtureId}|${market.bookmakerName}`;
+          if (seenKeys.has(dedupeKey)) continue;
+          seenKeys.add(dedupeKey);
+
+          output.push({
+            source: "api-football",
+            bookmaker: market.bookmakerName,
+            league: leagueName,
+            league_id: item.league?.id,
+            fixture_id: fixtureId,
+            home_team: home,
+            away_team: away,
+            commence_time: commenceTime,
+            source_url: `${API_BASE}/odds?league=${leagueId}&season=${season}&date=${date}`,
+            odds_1: market.odds1,
+            odds_x: market.oddsX,
+            odds_2: market.odds2,
+            raw: item
+          });
         }
 
-        output.push({
-          source: "api-football",
-          bookmaker: market.bookmakerName,
-          league: leagueName,
-          league_id: item.league?.id,
-          fixture_id: fixtureId,
-          home_team: home,
-          away_team: away,
-          commence_time: commenceTime,
-          source_url: `${API_BASE}/odds?league=${leagueId}&season=${season}&date=${date}`,
-          odds_1: market.odds1,
-          odds_x: market.oddsX,
-          odds_2: market.odds2,
-          raw: item
-        });
-      }
-
-      page += 1;
-    } while (page <= totalPages);
+        page += 1;
+      } while (page <= totalPages);
+    }
   }
+
+  logInfo("API-Football final extracted count", {
+    matches: output.length
+  });
 
   return output;
 }
