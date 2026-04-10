@@ -1,4 +1,4 @@
-import { RawMatchOdds, NormalizedOddsRow } from "../types/odds.js";
+import { RawMatchOdds, NormalizedOddsRow } from "../types/odds";
 
 function normalizeTeamName(name: string): string {
   return name
@@ -17,9 +17,12 @@ export function toNormalizedRows(match: RawMatchOdds): NormalizedOddsRow[] {
 
   return [
     {
+      source: "api-football",
       bookmaker: match.bookmaker,
       sport: "football",
       league: match.league,
+      league_id: match.league_id,
+      fixture_id: match.fixture_id,
       home_team_raw: match.home_team,
       away_team_raw: match.away_team,
       home_team_norm: homeNorm,
@@ -33,9 +36,12 @@ export function toNormalizedRows(match: RawMatchOdds): NormalizedOddsRow[] {
       raw: match.raw
     },
     {
+      source: "api-football",
       bookmaker: match.bookmaker,
       sport: "football",
       league: match.league,
+      league_id: match.league_id,
+      fixture_id: match.fixture_id,
       home_team_raw: match.home_team,
       away_team_raw: match.away_team,
       home_team_norm: homeNorm,
@@ -49,9 +55,12 @@ export function toNormalizedRows(match: RawMatchOdds): NormalizedOddsRow[] {
       raw: match.raw
     },
     {
+      source: "api-football",
       bookmaker: match.bookmaker,
       sport: "football",
       league: match.league,
+      league_id: match.league_id,
+      fixture_id: match.fixture_id,
       home_team_raw: match.home_team,
       away_team_raw: match.away_team,
       home_team_norm: homeNorm,
@@ -66,3 +75,4 @@ export function toNormalizedRows(match: RawMatchOdds): NormalizedOddsRow[] {
     }
   ];
 }
+
