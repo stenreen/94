@@ -48,6 +48,6 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           APIFOOTBALL_API_KEY: ${{ secrets.APIFOOTBALL_API_KEY }}
-          LEAGUE_IDS: "113,39,140,135,78,61,94,88,203,144"
-          SEASON: "2026"
+          LEAGUE_IDS: "39,140,135,113,78,61,94,88"
+LOOKAHEAD_DAYS: "4"
         run: npm run scrape
