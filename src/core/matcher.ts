@@ -1,12 +1,17 @@
 export function makeSourceKey(
-  bookmaker: string,
+  source: string,
+  fixtureId: number | undefined,
   league: string,
   homeTeamNorm: string,
   awayTeamNorm: string,
   commenceTime: string
 ): string {
+  if (fixtureId) {
+    return `${source}|fixture|${fixtureId}`;
+  }
+
   return [
-    bookmaker.trim().toLowerCase(),
+    source.trim().toLowerCase(),
     league.trim().toLowerCase(),
     homeTeamNorm,
     awayTeamNorm,
