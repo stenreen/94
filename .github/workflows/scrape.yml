@@ -1,4 +1,4 @@
-name: Daily API-Football odds scrape
+name: Daily The Odds API scrape
 
 on:
   workflow_dispatch:
@@ -26,7 +26,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          APIFOOTBALL_API_KEY: ${{ secrets.APIFOOTBALL_API_KEY }}
+          THEODDS_API_KEY: ${{ secrets.THEODDS_API_KEY }}
         run: |
           if [ -z "$SUPABASE_URL" ]; then
             echo "SUPABASE_URL saknas"
@@ -36,8 +36,8 @@ jobs:
             echo "SUPABASE_SERVICE_ROLE_KEY saknas"
             exit 1
           fi
-          if [ -z "$APIFOOTBALL_API_KEY" ]; then
-            echo "APIFOOTBALL_API_KEY saknas"
+          if [ -z "$THEODDS_API_KEY" ]; then
+            echo "THEODDS_API_KEY saknas"
             exit 1
           fi
           echo "Secrets ser OK ut"
@@ -46,7 +46,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          APIFOOTBALL_API_KEY: ${{ secrets.APIFOOTBALL_API_KEY }}
-          LEAGUE_IDS: "39,140,135,113,78,61,94,88"
-          LOOKAHEAD_DAYS: "4"
+          THEODDS_API_KEY: ${{ secrets.THEODDS_API_KEY }}
+          LEAGUE_KEYS: "soccer_epl,soccer_spain_la_liga,soccer_italy_serie_a,soccer_germany_bundesliga,soccer_france_ligue_one,soccer_sweden_allsvenskan"
+          LOOKAHEAD_HOURS: "168"
         run: npm run scrape
