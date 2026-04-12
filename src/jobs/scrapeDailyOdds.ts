@@ -1,4 +1,4 @@
-import { scrapeTheOddsApiDailyOdds } from "../adapters/theOddsApi.js";
+import { scrapeTheOddsApiDailyOdds } from "../adapters/theOddsApi.ts";
 import { toNormalizedRows } from "../core/normalize.ts";
 import { makeSourceKey } from "../core/matcher.ts";
 import { supabase } from "../db/supabase.ts";
