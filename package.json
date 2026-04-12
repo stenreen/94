@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-  "dev": "npx tsx src/index.ts",
-  "scrape": "npx tsx src/jobs/scrapeDailyOdds.ts",
-  "list-sports": "npx tsx src/jobs/listSports.ts",
-  "build": "tsc"
-}
+    "dev": "npx tsx src/index.ts",
+    "scrape": "npx tsx src/jobs/scrapeDailyOdds.ts",
+    "list-sports": "npx tsx src/jobs/listSports.ts",
+    "build": "tsc"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
     "dotenv": "^16.4.5",
