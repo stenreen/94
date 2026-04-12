@@ -1,8 +1,8 @@
 import { scrapeTheOddsApiDailyOdds } from "../adapters/theOddsApi.js";
-import { toNormalizedRows } from "../core/normalize.js";
-import { makeSourceKey } from "../core/matcher.js";
-import { supabase } from "../db/supabase.js";
-import { logError, logInfo } from "../core/logger.js";
+import { toNormalizedRows } from "../core/normalize.ts";
+import { makeSourceKey } from "../core/matcher.ts";
+import { supabase } from "../db/supabase.ts";
+import { logError, logInfo } from "../core/logger.ts";
 
 async function main() {
   const source = "the-odds-api";
