@@ -1,4 +1,3 @@
-import "dotenv/config";
 import { scrapeTheOddsApiDailyOdds } from "../adapters/theOddsApi.js";
 import { toNormalizedRows } from "../core/normalize.js";
 import { makeSourceKey } from "../core/matcher.js";
