@@ -1,12 +1,12 @@
 export type Selection = "1" | "X" | "2";
 
 export type NormalizedOddsRow = {
-  source: "api-football";
+  source: "the-odds-api";
   bookmaker: string;
   sport: "football";
   league: string;
-  league_id?: number;
-  fixture_id?: number;
+  sport_key?: string;
+  event_id?: string;
   home_team_raw: string;
   away_team_raw: string;
   home_team_norm: string;
@@ -21,11 +21,11 @@ export type NormalizedOddsRow = {
 };
 
 export type RawMatchOdds = {
-  source: "api-football";
+  source: "the-odds-api";
   bookmaker: string;
   league: string;
-  league_id?: number;
-  fixture_id?: number;
+  sport_key?: string;
+  event_id?: string;
   home_team: string;
   away_team: string;
   commence_time: string;
