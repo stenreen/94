@@ -1,12 +1,12 @@
 import "dotenv/config";
-import { scrapeApiFootballDailyOdds } from "../adapters/apiFootball";
-import { toNormalizedRows } from "../core/normalize";
-import { makeSourceKey } from "../core/matcher";
-import { supabase } from "../db/supabase";
-import { logError, logInfo } from "../core/logger";
+import { scrapeTheOddsApiDailyOdds } from "../adapters/theOddsApi.js";
+import { toNormalizedRows } from "../core/normalize.js";
+import { makeSourceKey } from "../core/matcher.js";
+import { supabase } from "../db/supabase.js";
+import { logError, logInfo } from "../core/logger.js";
 
 async function main() {
-  const source = "api-football";
+  const source = "the-odds-api";
   const startedAt = new Date().toISOString();
 
   const { data: runRow, error: runInsertError } = await supabase
@@ -25,7 +25,7 @@ async function main() {
   const runId = runRow.id;
 
   try {
-    const matches = await scrapeApiFootballDailyOdds();
+    const matches = await scrapeTheOddsApiDailyOdds();
 
     logInfo("Matches extracted", { source, count: matches.length });
     console.log(JSON.stringify(matches.slice(0, 3), null, 2));
@@ -38,11 +38,12 @@ async function main() {
 
       const sourceKey = makeSourceKey(
         sample.source,
-        sample.fixture_id,
+        sample.event_id,
         sample.league,
         sample.home_team_norm,
         sample.away_team_norm,
-        sample.commence_time
+        sample.commence_time,
+        sample.bookmaker
       );
 
       const { data: eventRow, error: eventError } = await supabase
