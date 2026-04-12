@@ -1,3 +1,3 @@
 import "dotenv/config";
 
-console.log("API-Football collector ready.");
+console.log("The Odds API collector ready.");
